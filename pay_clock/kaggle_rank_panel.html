@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kaggle Rank · Time Blocks</title>
+<style>
+  :root { --ground:#0b0f14; --panel:#0e141b; --ink:#e2e8f0; --muted:#8c9ba5; --accent:#9fd8ef; --copper:#d06a32; --moss:#34d399; --line:rgba(255,255,255,.1); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font: 14px/1.45 ui-sans-serif, system-ui, sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 12px; }
+  .bar { display: flex; justify-content: space-between; gap: 12px; align-items: end; }
+  h1 { margin: 0; font-size: 18px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); font-size: 12px; }
+  .grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 12px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+  h2 { margin: 0 0 10px; font-size: 13px; color: var(--accent); letter-spacing: .04em; text-transform: uppercase; }
+  article { border: 1px solid var(--line); border-radius: 14px; padding: 10px; margin-bottom: 8px; display: grid; grid-template-columns: 36px 1fr auto; gap: 8px; }
+  article.now { border-color: rgba(208,106,50,.65); }
+  .n { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: #121b26; color: var(--accent); font-family: ui-monospace, monospace; }
+  h3 { margin: 0 0 4px; font-size: 15px; }
+  p { margin: 0; color: var(--muted); font-size: 12px; }
+  a, button, input, select { font: inherit; }
+  a, button { border: 1px solid var(--line); background: #121b26; color: var(--ink); border-radius: 16px; padding: 6px 10px; text-decoration: none; cursor: pointer; }
+  a.primary, button.primary { background: var(--accent); color: #0b0f14; border-color: var(--accent); }
+  .pill { font-size: 11px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px; color: var(--copper); height: fit-content; }
+  .block, .rem, .log div { display: grid; grid-template-columns: 18px 88px 1fr; gap: 8px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .rem, .log div { grid-template-columns: 64px 1fr; }
+  .row { display: flex; gap: 8px; margin-top: 8px; }
+  input, select { background: #0b0f14; color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 7px 8px; }
+  input[type="text"] { flex: 1; }
+  .note { color: var(--muted); font-size: 12px; }
+  @media (max-width: 800px) { .grid, .bar { display: block; } section { margin-top: 12px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div>
+      <div class="mono">Added panel · existing workbench unchanged</div>
+      <h1>Kaggle rank, reminders, time blocks</h1>
+    </div>
+    <div class="mono" id="now"></div>
+  </div>
+  <p class="note">Submissions do not pay daily. Rank is the daily output. The only cash gate before next week is the Benchmarking Challenge: $500 × 5, closes Oct 11, 2026, 11:59 PM PDT. Winners announced Nov 5. A public Kaggle benchmark link is required in the DEV post.</p>
+  <div class="grid">
+    <section>
+      <h2>Ranking · nearest payable first</h2>
+      <div id="board"></div>
+    </section>
+    <div>
+      <section>
+        <h2>Today · multiple blocks</h2>
+        <div id="blocks"></div>
+      </section>
+      <section style="margin-top:12px">
+        <h2>Reminders</h2>
+        <div id="rems"></div>
+        <div class="row">
+          <input id="rt" type="time" value="16:30" />
+          <input id="rx" type="text" placeholder="Reminder" />
+          <button class="primary" id="add-rem">Add</button>
+        </div>
+        <div class="row"><button id="arm">Arm alarms</button></div>
+        <div id="banner" class="note"></div>
+      </section>
+      <section style="margin-top:12px">
+        <h2>Submission log</h2>
+        <div class="row">
+          <select id="lc"></select>
+          <input id="ln" type="text" placeholder="What shipped" />
+          <button class="primary" id="add-log">Log</button>
+        </div>
+        <div id="log"></div>
+      </section>
+    </div>
+  </div>
+</div>
+<script>
+const KEY = "kaggle-rank-panel-v1";
+const comps = [
+  { id:"bench", n:1, klass:"now", name:"Kaggle Benchmarking Challenge", prize:"$500 × 5", close:"2026-10-12T01:59:00-05:00", label:"Oct 11, 11:59 PM PDT", why:"Reuse the hallucination benchmark. Judged post, not a leaderboard.", href:"https://dev.to/challenges/kaggle-2026-09-23", pill:"This week" },
+  { id:"legal", n:2, klass:"", name:"LLM Agentic Legal Information Retrieval", prize:"$10,000", close:"2026-12-05T18:59:00-06:00", label:"Confirm close on rules", why:"Daily lane. One citation-F1 submission. Pays only if placed.", href:"https://www.kaggle.com/competitions/llm-agentic-legal-information-retrieval", pill:"Daily" },
+  { id:"agi", n:3, klass:"", name:"Measuring Progress Toward AGI", prize:"$200,000", close:"2026-10-15T18:59:00-05:00", label:"Listed ~10 days · confirm", why:"Open rules before the block. If closed, use the block for a second legal submission.", href:"https://www.kaggle.com/competitions/kaggle-measuring-agi", pill:"Verify" },
+  { id:"gemma", n:4, klass:"", name:"Gemma 4 Developer Agent", prize:"$100,000", close:"2026-11-25T23:59:00-06:00", label:"Entry Nov 25", why:"After the Oct 11 post. Not this week's cash.", href:"https://www.kaggle.com/competitions", pill:"Later" }
+];
+const blocks = [
+  { id:"b1", t:"08:00–09:30", title:"Freeze benchmark", detail:"Cases, metric, one public notebook." },
+  { id:"b2", t:"09:30–11:30", title:"DEV post", detail:"Kaggle link and #kagglechallenge in the draft." },
+  { id:"b3", t:"13:00–15:00", title:"Legal IR submission", detail:"One run. Log the score." },
+  { id:"b4", t:"15:30–16:30", title:"Second block", detail:"AGI task if still open, otherwise second legal submission." },
+  { id:"b5", t:"19:00–19:20", title:"Log rank", detail:"Write score and tomorrow's first block." }
+];
+const state = JSON.parse(localStorage.getItem(KEY) || "null") || { done:{}, ranks:{}, rems:[{time:"08:00",text:"Start freeze block"},{time:"11:00",text:"Kaggle link must be in the post"},{time:"16:30",text:"Last submission window"}], log:[], armed:false };
+const save = () => localStorage.setItem(KEY, JSON.stringify(state));
+const left = iso => { const d = Math.ceil((new Date(iso)-new Date())/86400000); return d < 0 ? "closed" : d + "d"; };
+function board() {
+  const root = document.getElementById("board"); root.innerHTML = "";
+  const sel = document.getElementById("lc"); sel.innerHTML = "";
+  comps.forEach(c => {
+    const el = document.createElement("article"); el.className = c.klass;
+    el.innerHTML = `<div class="n">${c.n}</div><div><h3>${c.name}</h3><p>${c.prize} · ${c.label} · ${left(c.close)}<br>${c.why}</p><div class="row"><a class="primary" href="${c.href}" target="_blank" rel="noopener">Rules</a><span class="mono">Rank <input data-id="${c.id}" value="${state.ranks[c.id]||""}" placeholder="—" style="width:64px" /></span></div></div><span class="pill">${c.pill}</span>`;
+    root.appendChild(el);
+    const o = document.createElement("option"); o.value = c.id; o.textContent = c.name; sel.appendChild(o);
+  });
+  root.querySelectorAll("input").forEach(i => i.onchange = () => { state.ranks[i.dataset.id] = i.value; save(); });
+}
+function drawBlocks() {
+  const root = document.getElementById("blocks"); root.innerHTML = "";
+  blocks.forEach(b => {
+    const el = document.createElement("label"); el.className = "block";
+    el.innerHTML = `<input type="checkbox" data-id="${b.id}" ${state.done[b.id]?"checked":""} /><span class="mono">${b.t}</span><div><strong>${b.title}</strong><p>${b.detail}</p></div>`;
+    root.appendChild(el);
+  });
+  root.querySelectorAll("input").forEach(b => b.onchange = () => { state.done[b.dataset.id] = b.checked; save(); });
+}
+function drawRems() {
+  const root = document.getElementById("rems"); root.innerHTML = "";
+  state.rems.forEach(r => { const d = document.createElement("div"); d.className = "rem"; d.innerHTML = `<span class="mono">${r.time}</span><span>${r.text}</span>`; root.appendChild(d); });
+}
+function drawLog() {
+  const root = document.getElementById("log"); root.innerHTML = "";
+  state.log.slice().reverse().forEach(i => { const d = document.createElement("div"); d.innerHTML = `<span class="mono">${i.at}</span><span>${i.name} · ${i.note}</span>`; root.appendChild(d); });
+}
+function tick() {
+  const now = new Date();
+  document.getElementById("now").textContent = now.toLocaleString("en-US", { hour:"2-digit", minute:"2-digit", weekday:"short", month:"short", day:"numeric", timeZone:"America/Chicago" }) + " CT";
+  if (!state.armed) return;
+  const hhmm = now.toLocaleTimeString("en-GB", { hour:"2-digit", minute:"2-digit", timeZone:"America/Chicago" });
+  const hit = state.rems.find(r => r.time === hhmm && state.last !== hhmm + r.text);
+  if (hit) { state.last = hhmm + hit.text; save(); document.getElementById("banner").textContent = hit.time + " · " + hit.text; if (Notification.permission === "granted") new Notification("Kaggle block", { body: hit.text }); }
+}
+document.getElementById("add-rem").onclick = () => { const time = document.getElementById("rt").value, text = document.getElementById("rx").value.trim(); if (!time || !text) return; state.rems.push({ time, text }); save(); drawRems(); document.getElementById("rx").value = ""; };
+document.getElementById("add-log").onclick = () => { const id = document.getElementById("lc").value, note = document.getElementById("ln").value.trim(); if (!note) return; state.log.push({ at: new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",timeZone:"America/Chicago"}), name: comps.find(c => c.id===id).name, note }); save(); drawLog(); document.getElementById("ln").value = ""; };
+document.getElementById("arm").onclick = async () => { state.armed = true; save(); if ("Notification" in window && Notification.permission === "default") { try { await Notification.requestPermission(); } catch(e) {} } document.getElementById("arm").textContent = "Alarms armed"; };
+board(); drawBlocks(); drawRems(); drawLog(); tick(); setInterval(tick, 10000);
+</script>
+</body>
+</html>
